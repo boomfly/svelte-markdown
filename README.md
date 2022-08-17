@@ -71,10 +71,16 @@ This would render something like
 </ul>
 <table>
   <thead>
-    <tr><th>And this is</th><th>A table</th></tr>
+    <tr>
+      <th>And this is</th>
+      <th>A table</th>
+    </tr>
   </thead>
   <tbody>
-    <tr><td>With two</td><td>columns</td></tr>
+    <tr>
+      <td>With two</td>
+      <td>columns</td>
+    </tr>
   </tbody>
 </table>
 ```
@@ -85,11 +91,56 @@ Just like with React Markdown, this package doesn't use `{@html ...}` unless you
 
 ## Options
 
-As of now there are only two options:
+The SvelteMarkdown component accepts the following options:
 
-* `source` - *string* The Markdown source to be parsed.
-* `renderers` - *object (optional)* An object where the keys represent a node type and the value is a Svelte component. This object will be merged with the default renderers. For now you can check how the default renderers are written in the source code at `src/renderers`.
-* `options` - *object (optional)* An object containing [options for Marked](https://marked.js.org/using_advanced#options)
+- `source` - _string_ or _array_ The Markdown source to be parsed, or an array of tokens to be rendered directly.
+- `renderers` - _object (optional)_ An object where the keys represent a node type and the value is a Svelte component. This object will be merged with the default renderers. For now you can check how the default renderers are written in the source code at `src/renderers`.
+- `options` - _object (optional)_ An object containing [options for Marked](https://marked.js.org/using_advanced#options)
+
+## Rendering From Tokens
+
+For greater flexibility, an array of tokens may be given as `source`, in which case parsing is skipped and the tokens will be rendered directly. This alows you to generate and transform the tokens freely beforehand. Example:
+
+```html
+<script>
+  import SvelteMarkdown from 'svelte-markdown'
+  import { marked } from 'marked'
+
+  const tokens = marked.lexer('this is an **example**')
+
+  marked.walkTokens(tokens, token=> {
+    if (token.type == 'strong') token.type = 'em'
+    token.raw = token.raw.toUpperCase()
+  })
+</script>
+
+<SvelteMarkdown source={tokens} />
+```
+
+This will render the following:
+
+```html
+<p>THIS IS AN <em>EXAMPLE</em></p>
+```
+
+## Events
+
+A `parsed` event will be fired when the final tokens have been calculated, allowing you to access the raw token array if needed for things like generating Table of Contents from headings.
+
+```html
+<script>
+  import SvelteMarkdown from 'svelte-markdown'
+
+  const source = `# This is a header`
+
+  function handleParsed(event) {
+    //access tokens via event.detail.tokens
+    console.log(event.detail.tokens);
+  }
+</script>
+
+<SvelteMarkdown {source} on:parsed={handleParsed}>
+```
 
 ## Available renderers
 
@@ -115,6 +166,50 @@ These would be the property names expected by the `renderers` option.
 - `codespan` - Inline code (`<code>`)
 - `code` - Block of code (`<pre><code>`)
 - `html` - HTML node
+
+### Optional List Renderers
+
+For fine detail styling of lists, it can be useful to differentiate between ordered and un-ordered lists.
+If either key is missing, the default `listitem` will be used. There are two
+optional keys in the `renderers` option which can provide this:
+
+- `orderedlistitem` - A list item appearing inside an ordered list
+- `unorderedlistitem` A list item appearing inside an un-ordered list
+
+As an example, if we have an `orderedlistitem`:
+
+```html
+<style>
+  li::marker {
+    color: blue;
+  }
+</style>
+
+<li><slot></slot></li>
+```
+
+Then numbers at the start of ordered list items would be colored blue. Bullets at the start of unordered list items
+would remain the default text color.
+
+### Inline Markdown
+
+To use [inline markdown](https://marked.js.org/using_advanced#inline), you can assign the prop `isInline` to the component.
+
+```html
+<SvelteMarkdown {source} isInline />
+```
+
+## HTML rendering
+
+While the most common flavours of markdown let you use HTML in markdown paragraphs, due to how Svelte handles plain HTML it is currently not possible to do this with this package. A paragraph must be either _all_ HTML or _all_ markdown.
+
+```markdown
+This is a **markdown** paragraph.
+
+<p>This is an <strong>HTML</strong> paragraph</p>
+```
+
+Note that the HTML paragraph must be enclosed within `<p>` tags.
 
 ## Developing
 
